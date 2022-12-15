@@ -1,42 +1,72 @@
 package main
 
 import (
-    "log"
-    //"os"
-    "strings"
+	"log"
 
-    "github.com/gin-gonic/gin"
+	//"os"
+	"strings"
 
-    "github.com/line/line-bot-sdk-go/linebot"
+	"github.com/gin-gonic/gin"
+
+	"github.com/line/line-bot-sdk-go/linebot"
 )
 
 func main() {
-    port := "3000"//os.Getenv("PORT")
+	port := "" //os.Getenv("PORT")
 
-    if port == "" {
-        log.Fatal("$PORT must be set")
-    }
-    bot, err := linebot.New(
-        "ac1cef1ef1b189e2a25cc20cb6a666ce",
-        "vJtxR7bXEHb4UNWMPeMv+kLgjdXMGGNUk8cFB26qQix+R/MIc+3E9fLiLvqiHPHEN/Bz8N2YikIDDoUGip5ZS/ZHeEjslBS4ouzTJUFX8y4saWp2Z/v7H9CAJbM3Uy6b7TjavQybANOpjV/PEDqsYgdB04t89/1O/w1cDnyilFU=",
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+	bot, err := linebot.New(
+		"CHANNEL_SECRET",
+		"CHANNEL_ACCESS_TOKEN",
     )
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    router := gin.New()
-    router.Use(gin.Logger())
+	router := gin.New()
+	router.Use(gin.Logger())
 
-    // LINE Messaging API ルーティング
-    //router.POST("/callback", func(c *gin.Context) {
+	// LINE Messaging API ルーティング
 	router.POST("/webhook", func(c *gin.Context) {
-        events, err := bot.ParseRequest(c.Request)
-        if err != nil {
-            if err == linebot.ErrInvalidSignature {
-                log.Print(err)
-            }
-            return
-        }
-    })
-    router.Run(":" + port)
+		events, err := bot.ParseRequest(c.Request)
+		if err != nil {
+			if err == linebot.ErrInvalidSignature {
+				log.Print(err)
+			}
+			return
+		}
+		// "保存" 単語を含む場合、返信される
+		replySave := "保存"
+		// "保存" 単語を含む場合、返信される
+		replyImage := "表示"
+		// チャットの回答
+		responseSave := "を保存しました"
+
+		// DBからとってきた写真
+		responseImage := linebot.NewImageMessage("", "")
+
+		for _, event := range events {
+			// イベントがメッセージの受信だった場合
+			if event.Type == linebot.EventTypeMessage {
+				switch message := event.Message.(type) {
+				// メッセージがテキスト形式の場合
+				case *linebot.TextMessage:
+					replyMessage := message.Text
+					// テキストで返信されるケース
+					if strings.Contains(replyMessage, replySave) {
+						bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(responseSave)).Do()
+
+					} else if strings.Contains(replyMessage, replyImage) {
+						bot.ReplyMessage(event.ReplyToken, responseImage).Do()
+					}
+
+					registerImage := linebot.NewImageMessage("", "")
+					bot.ReplyMessage(event.ReplyToken, registerImage).Do()
+				}
+			}
+		}
+	})
+	router.Run(":" + port)
 }
